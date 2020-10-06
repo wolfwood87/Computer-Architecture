@@ -5,6 +5,12 @@ import sys
 HLT = 0b00000001
 LDI = 0b00000010
 PRN = 0b00000111
+
+#Stack operations
+POP =  0b00000110
+PUSH = 0b00000101
+
+#ALU operations
 MUL = 0b10100010
 ADD = 0b10100000
 
@@ -16,16 +22,17 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.pc = 0
+        self.reg[7] = 0xF4
 
-    def load(self):
+    def load(self, filename):
         """Load a program into memory."""
-
-        if len(sys.argv) == 2:
-            filename = sys.argv[1]
-        else:
-            print("please pass a file name as an argument")
-            sys.exit()
         address = 0
+        # if len(sys.argv) == 2:
+        #     filename = sys.argv[1]
+        # else:
+        #     print("please pass a file name as an argument")
+        #     sys.exit()
+        
         # For now, we've just hardcoded a program:
 
         # program = [
@@ -65,7 +72,9 @@ class CPU:
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        if op == "MUL":
+        elif op == "SUB":
+            self.reg[reg_a] -= self.reg[reg_b]
+        elif op == "MUL":
             self.reg[reg_a] = self.reg[reg_a] * self.reg[reg_b]
         #elif op == "SUB": etc
         else:
@@ -90,15 +99,15 @@ class CPU:
             print(" %02X" % self.reg[i], end='')
 
         print()
-
+# F3 start of stack
     def run(self):
-        self.load()
+        # self.load()
         running = True
         while running:
             ir = self.ram_read(self.pc)
             num_of_ops = (ir & 0b11111111) >> 6
             alu_indicator = (ir & 0b00100000) >> 5 
-            set_indicator = (ir & 0b00011111) >> 4
+            set_indicator = (ir & 0b00010000) >> 4
             instructions = ir & 0b00001111
             if num_of_ops >= 1:
                 operand_a = self.ram_read(self.pc + 1)
@@ -117,6 +126,23 @@ class CPU:
             elif instructions == LDI:
                 self.reg[operand_a] = operand_b
                 self.pc += 3
+            elif instructions == PUSH:
+                if self.reg[7] == 0:
+                    self.reg[7] = 255
+                else:
+                    self.reg[7] -= 1
+                value = self.reg[operand_a]
+                self.ram[self.reg[7]] = value
+                self.pc += 2
+            elif instructions == POP:
+                sp = self.reg[7]
+                value = self.ram[sp]
+                self.reg[operand_a] = value
+                if self.reg[7] == 255:
+                    self.reg[7] = 0
+                else:
+                    self.reg[7] += 1
+                self.pc += 2
             elif instructions == PRN:
                 print(self.reg[operand_a])
                 self.pc += 2
@@ -129,5 +155,5 @@ class CPU:
                 running = False
 
 
-x = CPU()
-x.run()
+# x = CPU()
+# x.run()
