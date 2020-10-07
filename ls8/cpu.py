@@ -2,6 +2,7 @@
 
 import sys
 
+#Standard operations
 HLT = 0b00000001
 LDI = 0b00000010
 PRN = 0b00000111
@@ -9,6 +10,8 @@ PRN = 0b00000111
 #Stack operations
 POP =  0b00000110
 PUSH = 0b00000101
+CALL = 0b01010000
+RET =  0b00010001
 
 #ALU operations
 MUL = 0b10100010
@@ -113,7 +116,18 @@ class CPU:
                 operand_a = self.ram_read(self.pc + 1)
             if num_of_ops == 2:
                 operand_b = self.ram_read(self.pc + 2)
-            if alu_indicator == 1:
+            if set_indicator == 1:
+                if ir == CALL:
+                    if self.reg[7] == 0:
+                        self.reg[7] == 255
+                    else:
+                        self.reg[7] -= 1
+                    self.ram[self.reg[7]] = self.pc + 2
+                    self.pc = self.reg[operand_a]
+                if ir == RET:
+                    print(self.reg[7])
+                    self.pc = self.ram[self.reg[7]]
+            elif alu_indicator == 1:
                 if ir == MUL:
                     self.alu("MUL", operand_a, operand_b)
                     self.pc += 3
