@@ -4,12 +4,12 @@ import sys
 
 #Standard operations
 HLT = 0b00000001
-LDI = 0b00000010
-PRN = 0b00000111
+LDI = 0b10000010
+PRN = 0b01000111
 
 #Stack operations
-POP =  0b00000110
-PUSH = 0b00000101
+POP =  0b01000110
+PUSH = 0b01000101
 
 #Set operations
 CALL = 0b01010000
@@ -35,6 +35,21 @@ class CPU:
         self.pc = 0
         self.reg[7] = 0xF4
         self.fl = 0b00000000
+        self.branchtable = {
+            HLT: self.hlt,
+            LDI: self.ldi,
+            PRN: self.prn,
+            POP: self.pop,
+            PUSH: self.push
+        }
+        self.set_table = {
+            JMP: self.jump,
+            CALL: self.call,
+            JEQ: self.jeq,
+            JNE: self.jne,
+            RET: self.ret
+        }
+        
 
     def load(self, filename):
         """Load a program into memory."""
@@ -121,44 +136,16 @@ class CPU:
 # F3 start of stack
     def run(self):
         # self.load()
-        running = True
-        while running:
+        self.running = True
+        while self.running:
             ir = self.ram_read(self.pc)
             num_of_ops = (ir & 0b11111111) >> 6
             alu_indicator = (ir & 0b00100000) >> 5 
             set_indicator = (ir & 0b00010000) >> 4
-            instructions = ir & 0b00001111
-            if num_of_ops >= 1:
-                operand_a = self.ram_read(self.pc + 1)
-            if num_of_ops == 2:
-                operand_b = self.ram_read(self.pc + 2)
+            operand_a = self.ram_read(self.pc + 1)
+            operand_b = self.ram_read(self.pc + 2)
             if set_indicator == 1:
-                if ir == JMP:
-                    self.pc = self.reg[operand_a]
-                elif ir == CALL:
-                    if self.reg[7] == 0:
-                        self.reg[7] = 255
-                    else:
-                        self.reg[7] -= 1
-                    self.ram[self.reg[7]] = self.pc + 2
-                    self.pc = self.reg[operand_a]
-                elif ir == JEQ:
-                    if self.fl == 0b1:
-                        self.pc = self.reg[operand_a]
-                    else:
-                        self.pc += 2
-                elif ir == JNE:
-                    if self.fl != 0b1:
-                        self.pc = self.reg[operand_a]
-                    else:
-                        self.pc += 2
-                elif ir == RET:
-                    value = self.ram[self.reg[7]]
-                    if self.reg[7] == 255:
-                        self.reg[7] = 0
-                    else:
-                        self.reg[7] += 1
-                    self.pc = value
+                self.set_table[ir](operand_a)
             elif alu_indicator == 1:
                 if ir == MUL:
                     self.alu("MUL", operand_a, operand_b)
@@ -172,37 +159,68 @@ class CPU:
                 else:
                     print("improper ALU operation")
                     self.pc += 3
-            elif instructions == LDI:
-                self.reg[operand_a] = operand_b
-                self.pc += 3
-            elif instructions == PUSH:
-                if self.reg[7] == 0:
-                    self.reg[7] = 255
-                else:
-                    self.reg[7] -= 1
-                value = self.reg[operand_a]
-                self.ram[self.reg[7]] = value
-                self.pc += 2
-            elif instructions == POP:
-                sp = self.reg[7]
-                value = self.ram[sp]
-                self.reg[operand_a] = value
-                if self.reg[7] == 255:
-                    self.reg[7] = 0
-                else:
-                    self.reg[7] += 1
-                self.pc += 2
-            elif instructions == PRN:
-                print(self.reg[operand_a])
-                self.pc += 2
-            elif instructions == HLT:
-                print("end of program")
-                running = False
-                exit()
-            else:
-                print("unknown command")
-                running = False
+            else: 
+                self.branchtable[ir](operand_a, operand_b)
 
+    def hlt(self, operand_a, operand_b):
+        self.running = False
 
+    def ldi(self, operand_a, operand_b):
+        self.reg[operand_a] = operand_b
+        self.pc += 3
+
+    def prn(self, operand_a, operand_b):
+        print(self.reg[operand_a])
+        self.pc += 2
+
+    def pop(self, operand_a, operand_b):
+        sp = self.reg[7]
+        value = self.ram[sp]
+        self.reg[operand_a] = value
+        if self.reg[7] == 255:
+            self.reg[7] = 0
+        else:
+            self.reg[7] += 1
+        self.pc += 2
+
+    def push(self, operand_a, operand_b):
+        if self.reg[7] == 0:
+            self.reg[7] = 255
+        else:
+            self.reg[7] -= 1
+        value = self.reg[operand_a]
+        self.ram[self.reg[7]] = value
+        self.pc += 2
+
+    def jump(self, operand_a):
+        self.pc = self.reg[operand_a]
+
+    def call(self, operand_a):
+        if self.reg[7] == 0:
+            self.reg[7] = 255
+        else:
+            self.reg[7] -= 1
+        self.ram[self.reg[7]] = self.pc + 2
+        self.pc = self.reg[operand_a]
+
+    def jeq(self, operand_a):
+        if self.fl == 0b1:
+            self.pc = self.reg[operand_a]
+        else:
+            self.pc += 2
+
+    def jne(self, operand_a):
+        if self.fl != 0b1:
+            self.pc = self.reg[operand_a]
+        else:
+            self.pc += 2
+
+    def ret(self, operand_a):
+        value = self.ram[self.reg[7]]
+        if self.reg[7] == 255:
+            self.reg[7] = 0
+        else:
+            self.reg[7] += 1
+        self.pc = value
 # x = CPU()
 # x.run()
