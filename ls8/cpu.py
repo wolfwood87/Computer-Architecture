@@ -10,12 +10,20 @@ PRN = 0b00000111
 #Stack operations
 POP =  0b00000110
 PUSH = 0b00000101
+
+#Set operations
 CALL = 0b01010000
 RET =  0b00010001
+JMP =  0b01010100
 
 #ALU operations
 MUL = 0b10100010
 ADD = 0b10100000
+
+#Sprint operations
+CMP = 0b10100111
+JEQ = 0b01010101
+JNE = 0b01010110
 
 class CPU:
     """Main CPU class."""
@@ -26,6 +34,7 @@ class CPU:
         self.reg = [0] * 8
         self.pc = 0
         self.reg[7] = 0xF4
+        self.fl = 0b00000000
 
     def load(self, filename):
         """Load a program into memory."""
@@ -79,6 +88,13 @@ class CPU:
             self.reg[reg_a] -= self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] = self.reg[reg_a] * self.reg[reg_b]
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.fl = 0b00000100
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.fl = 0b00000010
+            elif self.reg[reg_a] == self.reg[reg_b]:
+                self.fl = 0b00000001
         #elif op == "SUB": etc
         else:
             raise Exception("Unsupported ALU operation")
@@ -117,22 +133,41 @@ class CPU:
             if num_of_ops == 2:
                 operand_b = self.ram_read(self.pc + 2)
             if set_indicator == 1:
-                if ir == CALL:
+                if ir == JMP:
+                    self.pc = self.reg[operand_a]
+                elif ir == CALL:
                     if self.reg[7] == 0:
-                        self.reg[7] == 255
+                        self.reg[7] = 255
                     else:
                         self.reg[7] -= 1
                     self.ram[self.reg[7]] = self.pc + 2
                     self.pc = self.reg[operand_a]
-                if ir == RET:
-                    print(self.reg[7])
-                    self.pc = self.ram[self.reg[7]]
+                elif ir == JEQ:
+                    if self.fl == 0b1:
+                        self.pc = self.reg[operand_a]
+                    else:
+                        self.pc += 2
+                elif ir == JNE:
+                    if self.fl != 0b1:
+                        self.pc = self.reg[operand_a]
+                    else:
+                        self.pc += 2
+                elif ir == RET:
+                    value = self.ram[self.reg[7]]
+                    if self.reg[7] == 255:
+                        self.reg[7] = 0
+                    else:
+                        self.reg[7] += 1
+                    self.pc = value
             elif alu_indicator == 1:
                 if ir == MUL:
                     self.alu("MUL", operand_a, operand_b)
                     self.pc += 3
                 elif ir == ADD:
                     self.alu("ADD", operand_a, operand_b)
+                    self.pc += 3
+                elif ir == CMP:
+                    self.alu("CMP", operand_a, operand_b)
                     self.pc += 3
                 else:
                     print("improper ALU operation")
