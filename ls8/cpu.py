@@ -42,7 +42,7 @@ class CPU:
         self.reg = [0] * 8
         self.pc = 0
         self.reg[7] = 0xF4
-        self.fl = 0b00000000
+        self.fl = 0b00000000 # flag for comparison
         self.branchtable = {
             HLT: self.hlt,
             LDI: self.ldi,
